@@ -17,8 +17,9 @@ const aiModules = [
     title: "Perplexity",
     description: "Recherche & veille marché : tendances Etsy, analyse concurrentielle, mots-clés SEO.",
     icon: Search,
-    status: "Disponible bientôt",
-    active: false,
+    status: "Actif",
+    active: true,
+    color: "text-primary",
     tasks: ["Tendances Etsy", "Analyse concurrentielle", "Recherche SEO"],
   },
   {
@@ -74,8 +75,8 @@ export default function AITools() {
                   </div>
                 ))}
               </div>
-              <Button className="mt-4 w-full" variant={m.active ? "default" : "outline"} disabled={!m.active} onClick={() => { if (m.active) window.location.href = "/produits"; }}>
-                {m.active ? "Utiliser dans Produits" : "Bientôt disponible"}
+              <Button className="mt-4 w-full" variant={m.active ? "default" : "outline"} disabled={!m.active} onClick={() => { if (m.active) window.location.href = m.title === "Perplexity" ? "/tendances" : "/produits"; }}>
+                {m.active ? (m.title === "Perplexity" ? "Rechercher des tendances" : "Utiliser dans Produits") : "Bientôt disponible"}
               </Button>
             </CardContent>
           </Card>

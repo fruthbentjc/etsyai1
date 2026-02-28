@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Products from "@/pages/Products";
 import Orders from "@/pages/Orders";
 import AITools from "@/pages/AITools";
+import Trends from "@/pages/Trends";
 import SettingsPage from "@/pages/SettingsPage";
 import AuthPage from "@/pages/AuthPage";
 import ResetPassword from "@/pages/ResetPassword";
@@ -62,6 +63,7 @@ const App = () => (
               <Route path="/produits" element={<Products />} />
               <Route path="/commandes" element={<Orders />} />
               <Route path="/ia" element={<AITools />} />
+              <Route path="/tendances" element={<Trends />} />
               <Route path="/parametres" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
