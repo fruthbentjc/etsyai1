@@ -10,9 +10,11 @@ import {
   Menu,
   X,
   Store,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Tableau de bord" },
@@ -25,6 +27,7 @@ const navItems = [
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -82,11 +85,20 @@ export default function AppLayout() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-sidebar-border p-4">
+        <div className="border-t border-sidebar-border p-4 space-y-2">
           <div className="rounded-lg bg-sidebar-accent/50 p-3">
             <p className="text-xs font-medium text-sidebar-foreground/80">API Etsy</p>
             <p className="text-xs text-sidebar-foreground/50">Non connecté</p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4" />
+            Déconnexion
+          </Button>
         </div>
       </aside>
 
@@ -104,8 +116,11 @@ export default function AppLayout() {
           </Button>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground sm:block">{user?.email}</span>
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-xs font-semibold text-primary">MA</span>
+              <span className="text-xs font-semibold text-primary">
+                {user?.email?.substring(0, 2).toUpperCase() || "?"}
+              </span>
             </div>
           </div>
         </header>
