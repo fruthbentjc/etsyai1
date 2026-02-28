@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -16,23 +15,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, ShoppingCart, ChevronRight } from "lucide-react";
-import { mockOrders, Order, ORDER_STATUS_CONFIG, OrderStatus } from "@/data/mock-data";
+import { Search, ShoppingCart, ChevronRight, Loader2 } from "lucide-react";
+import { useOrders, Order, ORDER_STATUS_CONFIG, OrderStatus } from "@/hooks/use-orders";
 
 export default function Orders() {
+  const { data: orders = [], isLoading } = useOrders();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const filtered = mockOrders.filter((o) => {
+  const filtered = orders.filter((o) => {
     const matchSearch =
-      o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
+      o.order_number.toLowerCase().includes(search.toLowerCase()) ||
       o.customer.name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
-  const statusCounts = mockOrders.reduce(
+  const statusCounts = orders.reduce(
     (acc, o) => {
       acc[o.status] = (acc[o.status] || 0) + 1;
       return acc;
@@ -40,11 +40,19 @@ export default function Orders() {
     {} as Record<string, number>
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Commandes</h1>
-        <p className="text-sm text-muted-foreground">{mockOrders.length} commandes au total</p>
+        <p className="text-sm text-muted-foreground">{orders.length} commandes au total</p>
       </div>
 
       {/* Status summary */}
@@ -90,12 +98,12 @@ export default function Orders() {
               <CardContent className="flex items-center gap-4 p-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-3">
-                    <p className="font-display text-sm font-semibold">{o.orderNumber}</p>
+                    <p className="font-display text-sm font-semibold">{o.order_number}</p>
                     <Badge variant="outline" className={cfg.className}>{cfg.label}</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">{o.customer.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {o.items.length} article(s) — {new Date(o.createdAt).toLocaleDateString("fr-FR")}
+                    {o.items.length} article(s) — {new Date(o.created_at).toLocaleDateString("fr-FR")}
                   </p>
                 </div>
                 <span className="font-display text-lg font-bold">{o.total.toFixed(2)} €</span>
@@ -119,7 +127,7 @@ export default function Orders() {
           {selectedOrder && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-display">Commande {selectedOrder.orderNumber}</DialogTitle>
+                <DialogTitle className="font-display">Commande {selectedOrder.order_number}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -148,9 +156,9 @@ export default function Orders() {
                   <span className="font-display text-lg font-bold">{selectedOrder.total.toFixed(2)} €</span>
                 </div>
                 <div className="flex gap-4 text-xs text-muted-foreground">
-                  <span>Créée : {new Date(selectedOrder.createdAt).toLocaleDateString("fr-FR")}</span>
-                  {selectedOrder.shippedAt && <span>Expédiée : {new Date(selectedOrder.shippedAt).toLocaleDateString("fr-FR")}</span>}
-                  {selectedOrder.deliveredAt && <span>Livrée : {new Date(selectedOrder.deliveredAt).toLocaleDateString("fr-FR")}</span>}
+                  <span>Créée : {new Date(selectedOrder.created_at).toLocaleDateString("fr-FR")}</span>
+                  {selectedOrder.shipped_at && <span>Expédiée : {new Date(selectedOrder.shipped_at).toLocaleDateString("fr-FR")}</span>}
+                  {selectedOrder.delivered_at && <span>Livrée : {new Date(selectedOrder.delivered_at).toLocaleDateString("fr-FR")}</span>}
                 </div>
               </div>
             </>
