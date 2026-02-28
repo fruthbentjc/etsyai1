@@ -19,12 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Eye, Heart, ShoppingCart, Pencil, Trash2, Package } from "lucide-react";
-import { mockProducts, Product, PRODUCT_STATUS_CONFIG, ProductStatus } from "@/data/mock-data";
+import { Plus, Search, Eye, Heart, ShoppingCart, Pencil, Trash2, Package, Loader2 } from "lucide-react";
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, Product, PRODUCT_STATUS_CONFIG, ProductStatus } from "@/hooks/use-products";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const { data: products = [], isLoading } = useProducts();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -38,8 +41,7 @@ export default function Products() {
   });
 
   const handleDelete = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    toast({ title: "Produit supprimé" });
+    deleteProduct.mutate(id, { onSuccess: () => toast({ title: "Produit supprimé" }) });
   };
 
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
@@ -55,38 +57,26 @@ export default function Products() {
     };
 
     if (editProduct) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === editProduct.id ? { ...p, ...data } : p))
-      );
-      toast({ title: "Produit modifié" });
+      updateProduct.mutate({ id: editProduct.id, ...data }, {
+        onSuccess: () => { toast({ title: "Produit modifié" }); setDialogOpen(false); setEditProduct(null); },
+      });
     } else {
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        ...data,
-        tags: [],
-        images: ["/placeholder.svg"],
-        variants: [],
-        views: 0,
-        favorites: 0,
-        sales: 0,
-        createdAt: new Date().toISOString().split("T")[0],
-      };
-      setProducts((prev) => [newProduct, ...prev]);
-      toast({ title: "Produit créé" });
+      createProduct.mutate(data, {
+        onSuccess: () => { toast({ title: "Produit créé" }); setDialogOpen(false); },
+      });
     }
-    setDialogOpen(false);
-    setEditProduct(null);
   };
 
-  const openEdit = (p: Product) => {
-    setEditProduct(p);
-    setDialogOpen(true);
-  };
+  const openEdit = (p: Product) => { setEditProduct(p); setDialogOpen(true); };
+  const openCreate = () => { setEditProduct(null); setDialogOpen(true); };
 
-  const openCreate = () => {
-    setEditProduct(null);
-    setDialogOpen(true);
-  };
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -138,7 +128,10 @@ export default function Products() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                <Button type="submit">{editProduct ? "Enregistrer" : "Créer"}</Button>
+                <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+                  {(createProduct.isPending || updateProduct.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editProduct ? "Enregistrer" : "Créer"}
+                </Button>
               </div>
             </form>
           </DialogContent>
@@ -171,7 +164,7 @@ export default function Products() {
           return (
             <Card key={p.id} className="group overflow-hidden">
               <div className="aspect-[4/3] bg-muted relative">
-                <img src={p.images[0]} alt={p.title} className="h-full w-full object-cover" />
+                <img src={p.images[0] || "/placeholder.svg"} alt={p.title} className="h-full w-full object-cover" />
                 <Badge variant="outline" className={`absolute right-2 top-2 ${cfg.className}`}>{cfg.label}</Badge>
               </div>
               <CardContent className="p-4">
