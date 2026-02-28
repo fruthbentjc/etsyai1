@@ -11,6 +11,7 @@ import {
   X,
   Store,
   LogOut,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const navItems = [
   { to: "/produits", icon: Package, label: "Produits" },
   { to: "/commandes", icon: ShoppingCart, label: "Commandes" },
   { to: "/ia", icon: Brain, label: "Outils IA" },
+  { to: "/tendances", icon: TrendingUp, label: "Tendances" },
   { to: "/parametres", icon: Settings, label: "Paramètres" },
 ];
 

@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.generate-seo-title]
 verify_jwt = false
+
+[functions.perplexity-trends]
+verify_jwt = false
