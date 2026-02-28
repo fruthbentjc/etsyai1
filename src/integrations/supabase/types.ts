@@ -26,6 +26,7 @@ export type Database = {
           status: Database["public"]["Enums"]["order_status"]
           total: number
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -38,6 +39,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -50,6 +52,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"]
           total?: number
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -68,6 +71,7 @@ export type Database = {
           tags: string[] | null
           title: string
           updated_at: string
+          user_id: string | null
           variants: Json | null
           views: number
         }
@@ -85,6 +89,7 @@ export type Database = {
           tags?: string[] | null
           title: string
           updated_at?: string
+          user_id?: string | null
           variants?: Json | null
           views?: number
         }
@@ -102,6 +107,7 @@ export type Database = {
           tags?: string[] | null
           title?: string
           updated_at?: string
+          user_id?: string | null
           variants?: Json | null
           views?: number
         }

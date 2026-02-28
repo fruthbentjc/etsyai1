@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type ProductStatus = "actif" | "brouillon" | "inactif";
 
@@ -71,6 +72,7 @@ export function useProducts() {
 
 export function useCreateProduct() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (product: {
       title: string;
@@ -79,6 +81,7 @@ export function useCreateProduct() {
       stock: number;
       category?: string;
       status?: ProductStatus;
+      images?: string[];
     }) => {
       const { data, error } = await supabase
         .from("products")
@@ -89,6 +92,8 @@ export function useCreateProduct() {
           stock: product.stock,
           category: product.category ?? "",
           status: product.status ?? "brouillon",
+          images: product.images ?? [],
+          user_id: user?.id,
         })
         .select()
         .single();
