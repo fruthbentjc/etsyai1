@@ -23,6 +23,7 @@ import { Plus, Search, Eye, Heart, ShoppingCart, Pencil, Trash2, Package, Loader
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, Product, PRODUCT_STATUS_CONFIG, ProductStatus } from "@/hooks/use-products";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import ProductImageManager from "@/components/ProductImageManager";
 
 export default function Products() {
   const { data: products = [], isLoading } = useProducts();
@@ -35,6 +36,7 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [formImages, setFormImages] = useState<string[]>([]);
 
   const filtered = products.filter((p) => {
     const matchSearch = p.title.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase());
@@ -56,6 +58,7 @@ export default function Products() {
       stock: parseInt(fd.get("stock") as string) || 0,
       category: fd.get("category") as string,
       status: (fd.get("status") as ProductStatus) || "brouillon",
+      images: formImages,
     };
 
     if (editProduct) {
@@ -69,8 +72,8 @@ export default function Products() {
     }
   };
 
-  const openEdit = (p: Product) => { setEditProduct(p); setDialogOpen(true); };
-  const openCreate = () => { setEditProduct(null); setDialogOpen(true); };
+  const openEdit = (p: Product) => { setEditProduct(p); setFormImages(p.images || []); setDialogOpen(true); };
+  const openCreate = () => { setEditProduct(null); setFormImages([]); setDialogOpen(true); };
 
   const handleGenerateDescription = async (form: HTMLFormElement) => {
     const fd = new FormData(form);
@@ -120,7 +123,7 @@ export default function Products() {
           <DialogTrigger asChild>
             <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Ajouter</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-display">{editProduct ? "Modifier le produit" : "Nouveau produit"}</DialogTitle>
             </DialogHeader>
@@ -173,6 +176,11 @@ export default function Products() {
                   </select>
                 </div>
               </div>
+              <ProductImageManager
+                images={formImages}
+                onChange={setFormImages}
+                productId={editProduct?.id}
+              />
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
                 <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
