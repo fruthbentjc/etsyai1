@@ -36,6 +36,8 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
   const [formImages, setFormImages] = useState<string[]>([]);
 
   const filtered = products.filter((p) => {
@@ -72,8 +74,44 @@ export default function Products() {
     }
   };
 
-  const openEdit = (p: Product) => { setEditProduct(p); setFormImages(p.images || []); setDialogOpen(true); };
-  const openCreate = () => { setEditProduct(null); setFormImages([]); setDialogOpen(true); };
+  const openEdit = (p: Product) => { setEditProduct(p); setFormImages(p.images || []); setTitleSuggestions([]); setDialogOpen(true); };
+  const openCreate = () => { setEditProduct(null); setFormImages([]); setTitleSuggestions([]); setDialogOpen(true); };
+
+  const handleGenerateSeoTitle = async (form: HTMLFormElement) => {
+    const fd = new FormData(form);
+    const title = fd.get("title") as string;
+    if (!title) {
+      toast({ title: "Entrez un titre d'abord", variant: "destructive" });
+      return;
+    }
+    setIsGeneratingTitle(true);
+    setTitleSuggestions([]);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-seo-title", {
+        body: { title, category: fd.get("category") as string },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.suggestions?.length) {
+        setTitleSuggestions(data.suggestions);
+        toast({ title: "Titres SEO générés ✨" });
+      }
+    } catch (e: any) {
+      toast({ title: "Erreur IA", description: e.message, variant: "destructive" });
+    } finally {
+      setIsGeneratingTitle(false);
+    }
+  };
+
+  const applySeoTitle = (suggestion: string, form: HTMLFormElement) => {
+    const input = form.querySelector<HTMLInputElement>("#title");
+    if (input) {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      nativeSetter?.call(input, suggestion);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    setTitleSuggestions([]);
+  };
 
   const handleGenerateDescription = async (form: HTMLFormElement) => {
     const fd = new FormData(form);
@@ -129,8 +167,42 @@ export default function Products() {
             </DialogHeader>
             <form onSubmit={handleSave} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Titre</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="title">Titre</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    disabled={isGeneratingTitle}
+                    onClick={(e) => {
+                      const form = (e.target as HTMLElement).closest("form");
+                      if (form) handleGenerateSeoTitle(form);
+                    }}
+                  >
+                    {isGeneratingTitle ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    {isGeneratingTitle ? "Génération…" : "Titre SEO IA"}
+                  </Button>
+                </div>
                 <Input id="title" name="title" defaultValue={editProduct?.title ?? ""} required />
+                {titleSuggestions.length > 0 && (
+                  <div className="space-y-1.5 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-xs font-medium text-primary">Suggestions SEO Etsy :</p>
+                    {titleSuggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="block w-full text-left rounded-md px-2.5 py-1.5 text-sm hover:bg-primary/10 transition-colors"
+                        onClick={(e) => {
+                          const form = (e.target as HTMLElement).closest("form");
+                          if (form) applySeoTitle(s, form);
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

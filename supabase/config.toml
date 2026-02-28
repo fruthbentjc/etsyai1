@@ -2,3 +2,6 @@ project_id = "sduptfgrlqpddxlmzbvf"
 
 [functions.generate-description]
 verify_jwt = false
+
+[functions.generate-seo-title]
+verify_jwt = false
