@@ -19,9 +19,10 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Eye, Heart, ShoppingCart, Pencil, Trash2, Package, Loader2 } from "lucide-react";
+import { Plus, Search, Eye, Heart, ShoppingCart, Pencil, Trash2, Package, Loader2, Sparkles } from "lucide-react";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, Product, PRODUCT_STATUS_CONFIG, ProductStatus } from "@/hooks/use-products";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Products() {
   const { data: products = [], isLoading } = useProducts();
@@ -33,6 +34,7 @@ export default function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const filtered = products.filter((p) => {
     const matchSearch = p.title.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase());
@@ -70,6 +72,35 @@ export default function Products() {
   const openEdit = (p: Product) => { setEditProduct(p); setDialogOpen(true); };
   const openCreate = () => { setEditProduct(null); setDialogOpen(true); };
 
+  const handleGenerateDescription = async (form: HTMLFormElement) => {
+    const fd = new FormData(form);
+    const title = fd.get("title") as string;
+    if (!title) {
+      toast({ title: "Entrez un titre d'abord", variant: "destructive" });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-description", {
+        body: { title, category: fd.get("category") as string, price: fd.get("price") as string },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const textarea = form.querySelector<HTMLTextAreaElement>("#description");
+      if (textarea && data?.description) {
+        // Use native setter to update the value properly
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+        nativeSetter?.call(textarea, data.description);
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      toast({ title: "Description générée ✨" });
+    } catch (e: any) {
+      toast({ title: "Erreur IA", description: e.message, variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -99,7 +130,23 @@ export default function Products() {
                 <Input id="title" name="title" defaultValue={editProduct?.title ?? ""} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="description">Description</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    disabled={isGenerating}
+                    onClick={(e) => {
+                      const form = (e.target as HTMLElement).closest("form");
+                      if (form) handleGenerateDescription(form);
+                    }}
+                  >
+                    {isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    {isGenerating ? "Génération…" : "Générer avec l'IA"}
+                  </Button>
+                </div>
                 <Textarea id="description" name="description" defaultValue={editProduct?.description ?? ""} rows={3} />
               </div>
               <div className="grid grid-cols-2 gap-4">

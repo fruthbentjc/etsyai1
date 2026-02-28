@@ -8,7 +8,8 @@ const aiModules = [
     title: "Lovable AI (Gemini)",
     description: "Génération de contenu : descriptions produits, titres optimisés, traduction multilingue.",
     icon: Sparkles,
-    status: "Disponible bientôt",
+    status: "Actif",
+    active: true,
     color: "text-primary",
     tasks: ["Rédaction de descriptions", "Suggestions de titres SEO", "Traduction multilingue"],
   },
@@ -17,7 +18,7 @@ const aiModules = [
     description: "Recherche & veille marché : tendances Etsy, analyse concurrentielle, mots-clés SEO.",
     icon: Search,
     status: "Disponible bientôt",
-    color: "text-primary",
+    active: false,
     tasks: ["Tendances Etsy", "Analyse concurrentielle", "Recherche SEO"],
   },
   {
@@ -25,7 +26,7 @@ const aiModules = [
     description: "Analyse avancée & stratégie : performance produits, recommandations pricing, prédictions.",
     icon: BarChart3,
     status: "Disponible bientôt",
-    color: "text-primary",
+    active: false,
     tasks: ["Analyse de performance", "Recommandations de prix", "Prédictions de ventes"],
   },
   {
@@ -33,7 +34,7 @@ const aiModules = [
     description: "Assistant conversationnel : réponses à vos questions, rédaction de messages, conseils personnalisés.",
     icon: MessageSquare,
     status: "Disponible bientôt",
-    color: "text-primary",
+    active: false,
     tasks: ["Chat intelligent", "Rédaction de messages clients", "Conseils personnalisés"],
   },
 ];
@@ -55,10 +56,10 @@ export default function AITools() {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                  <m.icon className={`h-5 w-5 ${m.color}`} />
+                  <m.icon className={`h-5 w-5 ${m.active ? "text-primary" : "text-muted-foreground"}`} />
                 </div>
-                <Badge variant="outline" className="bg-muted text-muted-foreground">
-                  <Lock className="mr-1 h-3 w-3" /> {m.status}
+                <Badge variant="outline" className={m.active ? "bg-primary/15 text-primary border-primary/30" : "bg-muted text-muted-foreground"}>
+                  {m.active ? <Sparkles className="mr-1 h-3 w-3" /> : <Lock className="mr-1 h-3 w-3" />} {m.status}
                 </Badge>
               </div>
               <CardTitle className="font-display text-base">{m.title}</CardTitle>
@@ -73,8 +74,8 @@ export default function AITools() {
                   </div>
                 ))}
               </div>
-              <Button className="mt-4 w-full" variant="outline" disabled>
-                Bientôt disponible
+              <Button className="mt-4 w-full" variant={m.active ? "default" : "outline"} disabled={!m.active} onClick={() => { if (m.active) window.location.href = "/produits"; }}>
+                {m.active ? "Utiliser dans Produits" : "Bientôt disponible"}
               </Button>
             </CardContent>
           </Card>
