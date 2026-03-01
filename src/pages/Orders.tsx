@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,14 +16,38 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, ShoppingCart, ChevronRight, Loader2 } from "lucide-react";
+import { Search, ShoppingCart, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { useOrders, Order, ORDER_STATUS_CONFIG, OrderStatus } from "@/hooks/use-orders";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export default function Orders() {
   const { data: orders = [], isLoading } = useOrders();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
+
+  async function handleSyncEtsy() {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("etsy-sync-orders");
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`${data.synced} commande(s) synchronisée(s) depuis Etsy`);
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      } else {
+        toast.error(data?.error || "Erreur de synchronisation");
+      }
+    } catch (err: any) {
+      console.error("Sync error:", err);
+      toast.error(err?.message || "Erreur lors de la synchronisation");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const filtered = orders.filter((o) => {
     const matchSearch =
@@ -50,9 +75,19 @@ export default function Orders() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Commandes</h1>
-        <p className="text-sm text-muted-foreground">{orders.length} commandes au total</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Commandes</h1>
+          <p className="text-sm text-muted-foreground">{orders.length} commandes au total</p>
+        </div>
+        <Button variant="outline" onClick={handleSyncEtsy} disabled={syncing}>
+          {syncing ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          Sync Etsy
+        </Button>
       </div>
 
       {/* Status summary */}
