@@ -48,8 +48,6 @@ serve(async (req) => {
     const codeChallenge = await generateCodeChallenge(codeVerifier);
 
     // Store code_verifier in state (will be passed back via callback)
-    // We encode user_id + code_verifier in state
-    const userId = claimsData.claims.sub as string;
     const state = btoa(JSON.stringify({ userId: user.id, codeVerifier }));
 
     const scopes = [
