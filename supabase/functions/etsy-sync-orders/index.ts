@@ -7,18 +7,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
 async function refreshTokenIfNeeded(
   supabase: any,
   tokenRow: any,
   apiKey: string
 ): Promise<string> {
   const expiresAt = new Date(tokenRow.expires_at).getTime();
-  // Refresh if expiring within 5 minutes
   if (Date.now() < expiresAt - 5 * 60 * 1000) {
     return tokenRow.access_token;
   }
 
-  console.log("Refreshing Etsy token…");
+  console.log(`Refreshing Etsy token for user ${tokenRow.user_id}…`);
   const res = await fetch("https://api.etsy.com/v3/public/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -69,20 +70,93 @@ interface EtsyReceipt {
   transactions: EtsyTransaction[];
 }
 
-function mapEtsyStatus(status: string): string {
-  switch (status) {
+function mapEtsyStatus(receipt: EtsyReceipt): string {
+  switch (receipt.status) {
     case "paid":
     case "open":
+      if (receipt.shipped_timestamp && !receipt.delivered_timestamp) return "expediee";
       return "en_attente";
     case "completed":
       return "livree";
     case "canceled":
       return "annulee";
     default:
-      // If the receipt has shipped info, we handle it below
+      if (receipt.shipped_timestamp && !receipt.delivered_timestamp) return "expediee";
       return "en_attente";
   }
 }
+
+// ── Sync one shop ────────────────────────────────────────────────────
+
+async function syncShop(
+  supabaseAdmin: any,
+  tokenRow: any,
+  apiKey: string
+): Promise<{ synced: number; total: number }> {
+  const accessToken = await refreshTokenIfNeeded(supabaseAdmin, tokenRow, apiKey);
+  const shopId = tokenRow.shop_id;
+  if (!shopId) throw new Error("Shop ID manquant");
+
+  const receiptsUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/receipts?limit=100&includes=Transactions`;
+  const receiptsRes = await fetch(receiptsUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": apiKey,
+    },
+  });
+
+  if (!receiptsRes.ok) {
+    const errText = await receiptsRes.text();
+    throw new Error(`Etsy API ${receiptsRes.status}: ${errText}`);
+  }
+
+  const receiptsData = await receiptsRes.json();
+  const receipts: EtsyReceipt[] = receiptsData.results || [];
+
+  let synced = 0;
+  for (const receipt of receipts) {
+    const orderNumber = `ETSY-${receipt.receipt_id}`;
+    const items = (receipt.transactions || []).map((t: EtsyTransaction) => ({
+      productTitle: t.title,
+      quantity: t.quantity,
+      price: t.price.amount / t.price.divisor,
+      variant: t.variations?.map((v) => v.formatted_value).join(", ") || undefined,
+    }));
+
+    const { error: upsertError } = await supabaseAdmin.from("orders").upsert(
+      {
+        order_number: orderNumber,
+        user_id: tokenRow.user_id,
+        customer: {
+          name: receipt.name || "Client Etsy",
+          email: receipt.buyer_email || "",
+          address: receipt.formatted_address || "",
+        },
+        items,
+        total: receipt.grandtotal.amount / receipt.grandtotal.divisor,
+        status: mapEtsyStatus(receipt),
+        created_at: new Date(receipt.create_timestamp * 1000).toISOString(),
+        shipped_at: receipt.shipped_timestamp
+          ? new Date(receipt.shipped_timestamp * 1000).toISOString()
+          : null,
+        delivered_at: receipt.delivered_timestamp
+          ? new Date(receipt.delivered_timestamp * 1000).toISOString()
+          : null,
+      },
+      { onConflict: "order_number" }
+    );
+
+    if (upsertError) {
+      console.error(`Upsert error for ${orderNumber}:`, upsertError);
+    } else {
+      synced++;
+    }
+  }
+
+  return { synced, total: receipts.length };
+}
+
+// ── Main handler ─────────────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -93,139 +167,79 @@ serve(async (req) => {
     const ETSY_API_KEY = Deno.env.get("ETSY_API_KEY");
     if (!ETSY_API_KEY) throw new Error("ETSY_API_KEY is not configured");
 
-    // Authenticate user
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const authHeader = req.headers.get("Authorization");
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+    // ── Mode 1: Authenticated user → sync only their shop ──
+    if (authHeader?.startsWith("Bearer ")) {
+      const supabaseUser = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: tokenRow } = await supabaseAdmin
+        .from("etsy_tokens")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!tokenRow) {
+        return new Response(
+          JSON.stringify({ error: "Boutique Etsy non connectée" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const result = await syncShop(supabaseAdmin, tokenRow, ETSY_API_KEY);
+      return new Response(JSON.stringify({ success: true, ...result }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = claimsData.claims.sub as string;
 
-    // Get Etsy tokens
-    const { data: tokenRow, error: tokenError } = await supabaseAdmin
+    // ── Mode 2: No user auth (cron) → sync ALL connected shops ──
+    console.log("Cron mode: syncing all connected Etsy shops…");
+
+    const { data: allTokens, error: tokensError } = await supabaseAdmin
       .from("etsy_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+      .select("*");
 
-    if (tokenError || !tokenRow) {
+    if (tokensError) throw tokensError;
+    if (!allTokens || allTokens.length === 0) {
       return new Response(
-        JSON.stringify({ error: "Boutique Etsy non connectée" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: true, message: "No connected shops", synced: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const shopId = tokenRow.shop_id;
-    if (!shopId) {
-      return new Response(
-        JSON.stringify({ error: "Shop ID manquant" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Refresh token if needed
-    const accessToken = await refreshTokenIfNeeded(supabaseAdmin, tokenRow, ETSY_API_KEY);
-
-    // Fetch receipts from Etsy (last 100)
-    const receiptsUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/receipts?limit=100&includes=Transactions`;
-    const receiptsRes = await fetch(receiptsUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "x-api-key": ETSY_API_KEY,
-      },
-    });
-
-    if (!receiptsRes.ok) {
-      const errText = await receiptsRes.text();
-      console.error("Etsy receipts error:", receiptsRes.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Erreur lors de la récupération des commandes Etsy" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const receiptsData = await receiptsRes.json();
-    const receipts: EtsyReceipt[] = receiptsData.results || [];
-
-    // Map and upsert orders
-    let synced = 0;
-    for (const receipt of receipts) {
-      const orderNumber = `ETSY-${receipt.receipt_id}`;
-      const items = (receipt.transactions || []).map((t: EtsyTransaction) => ({
-        productTitle: t.title,
-        quantity: t.quantity,
-        price: t.price.amount / t.price.divisor,
-        variant: t.variations?.map((v) => v.formatted_value).join(", ") || undefined,
-      }));
-
-      const total = receipt.grandtotal.amount / receipt.grandtotal.divisor;
-
-      let status = mapEtsyStatus(receipt.status);
-      // Override with shipped if we have shipped_timestamp but not delivered
-      if (receipt.shipped_timestamp && !receipt.delivered_timestamp && status === "en_attente") {
-        status = "expediee";
-      }
-
-      const createdAt = new Date(receipt.create_timestamp * 1000).toISOString();
-      const shippedAt = receipt.shipped_timestamp
-        ? new Date(receipt.shipped_timestamp * 1000).toISOString()
-        : null;
-      const deliveredAt = receipt.delivered_timestamp
-        ? new Date(receipt.delivered_timestamp * 1000).toISOString()
-        : null;
-
-      const { error: upsertError } = await supabaseAdmin
-        .from("orders")
-        .upsert(
-          {
-            order_number: orderNumber,
-            user_id: userId,
-            customer: {
-              name: receipt.name || "Client Etsy",
-              email: receipt.buyer_email || "",
-              address: receipt.formatted_address || "",
-            },
-            items,
-            total,
-            status,
-            created_at: createdAt,
-            shipped_at: shippedAt,
-            delivered_at: deliveredAt,
-          },
-          { onConflict: "order_number" }
-        );
-
-      if (upsertError) {
-        console.error(`Upsert error for ${orderNumber}:`, upsertError);
-      } else {
-        synced++;
+    let totalSynced = 0;
+    let errors = 0;
+    for (const tokenRow of allTokens) {
+      try {
+        const result = await syncShop(supabaseAdmin, tokenRow, ETSY_API_KEY);
+        totalSynced += result.synced;
+        console.log(`User ${tokenRow.user_id}: synced ${result.synced}/${result.total}`);
+      } catch (err) {
+        errors++;
+        console.error(`Error syncing user ${tokenRow.user_id}:`, err);
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, synced, total: receipts.length }),
+      JSON.stringify({ success: true, synced: totalSynced, users: allTokens.length, errors }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
