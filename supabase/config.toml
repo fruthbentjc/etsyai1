@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.etsy-callback]
 verify_jwt = false
+
+[functions.etsy-sync-orders]
+verify_jwt = false
