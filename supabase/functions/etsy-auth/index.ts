@@ -33,9 +33,8 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -51,7 +50,7 @@ serve(async (req) => {
     // Store code_verifier in state (will be passed back via callback)
     // We encode user_id + code_verifier in state
     const userId = claimsData.claims.sub as string;
-    const state = btoa(JSON.stringify({ userId, codeVerifier }));
+    const state = btoa(JSON.stringify({ userId: user.id, codeVerifier }));
 
     const scopes = [
       "transactions_r",
