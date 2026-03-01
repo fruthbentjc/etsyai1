@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Key, Store, Globe, Loader2, CheckCircle2, ExternalLink, RefreshCw, Package } from "lucide-react";
+import { Key, Store, Globe, Loader2, CheckCircle2, ExternalLink, RefreshCw, Package, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -20,8 +20,10 @@ export default function SettingsPage() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [syncingProducts, setSyncingProducts] = useState(false);
   const [syncingOrders, setSyncingOrders] = useState(false);
+  const [lastSyncProducts, setLastSyncProducts] = useState<string | null>(null);
+  const [lastSyncOrders, setLastSyncOrders] = useState<string | null>(null);
 
-  // Check Etsy connection status
+  // Check Etsy connection status & last sync dates
   useEffect(() => {
     async function checkConnection() {
       if (!user) return;
@@ -36,6 +38,24 @@ export default function SettingsPage() {
         setShopName(data.shop_name);
       }
       setLoadingStatus(false);
+
+      // Fetch last sync dates
+      const { data: lastProduct } = await supabase
+        .from("products")
+        .select("updated_at")
+        .not("etsy_listing_id", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastProduct) setLastSyncProducts(lastProduct.updated_at);
+
+      const { data: lastOrder } = await supabase
+        .from("orders")
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastOrder) setLastSyncOrders(lastOrder.updated_at);
     }
     checkConnection();
   }, [user]);
@@ -186,6 +206,24 @@ export default function SettingsPage() {
                   Sync Commandes
                 </Button>
               </div>
+              {(lastSyncProducts || lastSyncOrders) && (
+                <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    Dernière synchronisation
+                  </div>
+                  {lastSyncProducts && (
+                    <p className="text-xs text-muted-foreground">
+                      Produits : {new Date(lastSyncProducts).toLocaleString("fr-FR")}
+                    </p>
+                  )}
+                  {lastSyncOrders && (
+                    <p className="text-xs text-muted-foreground">
+                      Commandes : {new Date(lastSyncOrders).toLocaleString("fr-FR")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-between">
