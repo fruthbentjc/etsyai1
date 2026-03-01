@@ -6,64 +6,89 @@ Application en français pour gérer votre boutique Etsy, avec chaque IA assign�
 
 ---
 
-## Phase 1 — Fondations
+## Phase 1 — Fondations ✅
 
-### 1. Tableau de bord principal
+### 1. Tableau de bord principal ✅
 - Vue d'ensemble : nombre de produits, commandes récentes, chiffre d'affaires
-- Navigation entre les sections (Produits, Commandes, Analyses, IA)
+- Navigation entre les sections (Produits, Commandes, Tendances, IA, Paramètres)
+- Routes protégées avec authentification
 
-### 2. Gestionnaire de produits (CRUD)
+### 2. Gestionnaire de produits (CRUD) ✅
 - Liste des produits avec recherche et filtres
 - Création / modification / suppression de fiches produits
-- Upload et gestion des photos (réorganisation, suppression)
-- Gestion des prix, stocks et variantes (taille, couleur, matière…)
+- Upload et gestion des photos (réorganisation, suppression) via `ProductImageManager`
+- Gestion des prix, stocks, tags, catégories et variantes
 - Statut de publication (brouillon / actif / inactif)
+- Synchronisation depuis Etsy (via edge function `etsy-sync-products`)
 
-### 3. Suivi des commandes
-- Liste des commandes avec statut (en attente, expédiée, livrée)
+### 3. Suivi des commandes ✅
+- Liste des commandes avec statut (en_attente, expediee, livree, annulee)
 - Détails de chaque commande (produits, client, adresse)
-- Filtres par statut et par date
+- Synchronisation depuis Etsy (via edge function `etsy-sync-orders`)
+- Mode cron pour synchronisation automatique de toutes les boutiques
 
-### 4. Connexion API Etsy
-- Authentification OAuth 2.0 avec votre compte Etsy
-- Synchronisation des produits et commandes
-- Edge functions sécurisées pour les appels API
+### 4. Connexion API Etsy ✅
+- Authentification OAuth 2.0 via edge functions (`etsy-auth`, `etsy-callback`)
+- Synchronisation des produits et commandes (boutons manuels dans Paramètres)
+- Indicateur de dernière synchronisation (produits & commandes)
+- Déconnexion de la boutique Etsy
+- Rafraîchissement automatique des tokens expirés
+
+### 5. Authentification ✅
+- Page de connexion / inscription (`/auth`)
+- Réinitialisation de mot de passe (`/reset-password`)
+- Routes protégées et routes publiques
+- Contexte d'authentification global (`AuthContext`)
+
+### 6. Page Paramètres ✅
+- Connexion/déconnexion Etsy avec statut visuel
+- Boutons de synchronisation manuelle (produits & commandes)
+- Date de dernière synchronisation affichée
+- Section clés API (OpenAI, Anthropic, Perplexity) — UI prête, BYOK à implémenter
+- Préférences générales (nom boutique, devise)
 
 ---
 
-## Phase 2 — Intelligence Artificielle Multi-Modèles
+## Phase 2 — Intelligence Artificielle Multi-Modèles (en cours)
 
-### 5. Lovable AI (Gemini) → Génération de contenu
-- Rédaction automatique de descriptions produits
-- Suggestions de titres optimisés pour Etsy
-- Traduction de fiches produits en plusieurs langues
+### 7. Lovable AI (Gemini) → Génération de contenu ⚙️
+- Rédaction automatique de descriptions produits (edge function `generate-description`)
+- Suggestions de titres optimisés SEO (edge function `generate-seo-title`)
+- Page outils IA (`/ia`)
+- 🔲 Traduction de fiches produits en plusieurs langues
 
-### 6. Perplexity → Recherche & Veille marché
-- **Recherche de tendances Etsy** : produits populaires, niches en croissance
-- **Analyse concurrentielle** : comparaison avec les boutiques similaires
-- **Recherche SEO** : meilleurs mots-clés et tags à utiliser
+### 8. Perplexity → Recherche & Veille marché ⚙️
+- Recherche de tendances Etsy (edge function `perplexity-trends`, page `/tendances`)
+- 🔲 Analyse concurrentielle
+- 🔲 Recherche SEO avancée (mots-clés et tags)
 
-### 7. OpenAI (GPT) → Analyse avancée & Stratégie
-- Analyse de performance des produits (lesquels promouvoir, lesquels retirer)
-- Recommandations de pricing basées sur le marché
-- Prédictions de ventes et conseils stratégiques
+### 9. OpenAI (GPT) → Analyse avancée & Stratégie 🔲
+- 🔲 Analyse de performance des produits
+- 🔲 Recommandations de pricing
+- 🔲 Prédictions de ventes
 
-### 8. Claude → Assistant conversationnel boutique
-- Chat intelligent pour répondre à vos questions sur la gestion Etsy
-- Aide à la rédaction de messages clients
-- Conseils personnalisés basés sur vos données boutique
+### 10. Claude → Assistant conversationnel boutique 🔲
+- 🔲 Chat intelligent pour questions gestion Etsy
+- 🔲 Aide à la rédaction de messages clients
+- 🔲 Conseils personnalisés basés sur les données boutique
 
-### 9. Page de configuration IA
-- Clés API par défaut (vos clés) pré-configurées
-- Option BYOK : chaque utilisateur peut entrer ses propres clés API (OpenAI, Anthropic, Perplexity)
-- Choix du modèle préféré par catégorie de tâche
-- Indicateur de consommation/crédits restants
+### 11. Page de configuration IA 🔲
+- 🔲 Option BYOK fonctionnelle (stockage sécurisé des clés)
+- 🔲 Choix du modèle par catégorie de tâche
+- 🔲 Indicateur de consommation/crédits
 
 ---
 
 ## Stack technique
 - **Frontend** : React + Tailwind CSS + shadcn/ui
-- **Backend** : Lovable Cloud (Supabase) — base de données, auth, edge functions, secrets
-- **IA** : Lovable AI (Gemini), Perplexity (connecteur), OpenAI & Claude (clés API via secrets)
+- **Backend** : Lovable Cloud — base de données, auth, edge functions, secrets
+- **IA** : Lovable AI (Gemini), Perplexity (edge function), OpenAI & Claude (à venir)
 - **API Etsy** : OAuth 2.0 via edge functions sécurisées
+- **Edge functions déployées** : `etsy-auth`, `etsy-callback`, `etsy-sync-products`, `etsy-sync-orders`, `generate-description`, `generate-seo-title`, `perplexity-trends`
 
+---
+
+### Légende
+- ✅ Terminé
+- ⚙️ Partiellement implémenté
+- 🔲 À faire
