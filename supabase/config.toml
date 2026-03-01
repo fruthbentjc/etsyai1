@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.perplexity-trends]
 verify_jwt = false
+
+[functions.etsy-auth]
+verify_jwt = false
+
+[functions.etsy-callback]
+verify_jwt = false

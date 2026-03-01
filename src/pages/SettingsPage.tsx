@@ -1,12 +1,111 @@
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Key, Store, Globe } from "lucide-react";
+import { Key, Store, Globe, Loader2, CheckCircle2, ExternalLink } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [etsyConnected, setEtsyConnected] = useState(false);
+  const [shopName, setShopName] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
+  // Check Etsy connection status
+  useEffect(() => {
+    async function checkConnection() {
+      if (!user) return;
+      const { data } = await supabase
+        .from("etsy_tokens")
+        .select("shop_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (data) {
+        setEtsyConnected(true);
+        setShopName(data.shop_name);
+      }
+      setLoadingStatus(false);
+    }
+    checkConnection();
+  }, [user]);
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+
+    if (code && state) {
+      handleCallback(code, state);
+      // Clean URL
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
+
+  async function handleCallback(code: string, state: string) {
+    setConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("etsy-callback", {
+        body: { code, state },
+      });
+
+      if (error) throw error;
+      if (data?.success) {
+        setEtsyConnected(true);
+        setShopName(data.shop_name);
+        toast.success("Boutique Etsy connectée avec succès !");
+      }
+    } catch (err) {
+      console.error("Callback error:", err);
+      toast.error("Erreur lors de la connexion Etsy");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleConnectEtsy() {
+    setConnecting(true);
+    try {
+      const redirectUri = window.location.origin + "/parametres";
+      const { data, error } = await supabase.functions.invoke("etsy-auth", {
+        body: { redirect_uri: redirectUri },
+      });
+
+      if (error) throw error;
+      if (data?.auth_url) {
+        window.location.href = data.auth_url;
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      toast.error("Erreur lors de l'initialisation OAuth");
+      setConnecting(false);
+    }
+  }
+
+  async function handleDisconnectEtsy() {
+    if (!user) return;
+    const { error } = await supabase
+      .from("etsy_tokens")
+      .delete()
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast.error("Erreur lors de la déconnexion");
+    } else {
+      setEtsyConnected(false);
+      setShopName(null);
+      toast.success("Boutique Etsy déconnectée");
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -28,11 +127,46 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
-            <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30">Non connecté</Badge>
-            <Button disabled>Connecter Etsy</Button>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">Nécessite Lovable Cloud pour les edge functions sécurisées.</p>
+          {loadingStatus ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Vérification...</span>
+            </div>
+          ) : etsyConnected ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-green-500/15 text-green-700 border-green-500/30">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Connecté
+                  </Badge>
+                  {shopName && <span className="text-sm font-medium">{shopName}</span>}
+                </div>
+                <Button variant="outline" size="sm" onClick={handleDisconnectEtsy}>
+                  Déconnecter
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30">
+                Non connecté
+              </Badge>
+              <Button onClick={handleConnectEtsy} disabled={connecting}>
+                {connecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connexion...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Connecter Etsy
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
