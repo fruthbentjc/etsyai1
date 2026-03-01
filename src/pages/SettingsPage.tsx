@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Key, Store, Globe, Loader2, CheckCircle2, ExternalLink } from "lucide-react";
+import { Key, Store, Globe, Loader2, CheckCircle2, ExternalLink, RefreshCw, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -18,6 +18,8 @@ export default function SettingsPage() {
   const [shopName, setShopName] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [syncingProducts, setSyncingProducts] = useState(false);
+  const [syncingOrders, setSyncingOrders] = useState(false);
 
   // Check Etsy connection status
   useEffect(() => {
@@ -90,6 +92,34 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSyncProducts() {
+    setSyncingProducts(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("etsy-sync-products");
+      if (error) throw error;
+      toast.success(`${data.synced ?? 0} produit(s) synchronisé(s) depuis Etsy`);
+    } catch (err) {
+      console.error("Sync products error:", err);
+      toast.error("Erreur lors de la synchronisation des produits");
+    } finally {
+      setSyncingProducts(false);
+    }
+  }
+
+  async function handleSyncOrders() {
+    setSyncingOrders(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("etsy-sync-orders");
+      if (error) throw error;
+      toast.success(`${data.synced ?? 0} commande(s) synchronisée(s) depuis Etsy`);
+    } catch (err) {
+      console.error("Sync orders error:", err);
+      toast.error("Erreur lors de la synchronisation des commandes");
+    } finally {
+      setSyncingOrders(false);
+    }
+  }
+
   async function handleDisconnectEtsy() {
     if (!user) return;
     const { error } = await supabase
@@ -133,7 +163,7 @@ export default function SettingsPage() {
               <span className="text-sm">Vérification...</span>
             </div>
           ) : etsyConnected ? (
-            <div className="space-y-3">
+              <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-green-500/15 text-green-700 border-green-500/30">
@@ -144,6 +174,16 @@ export default function SettingsPage() {
                 </div>
                 <Button variant="outline" size="sm" onClick={handleDisconnectEtsy}>
                   Déconnecter
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleSyncProducts} disabled={syncingProducts}>
+                  {syncingProducts ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
+                  Sync Produits
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSyncOrders} disabled={syncingOrders}>
+                  {syncingOrders ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  Sync Commandes
                 </Button>
               </div>
             </div>

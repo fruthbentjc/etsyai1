@@ -97,6 +97,7 @@ export type Database = {
           category: string | null
           created_at: string
           description: string | null
+          etsy_listing_id: string | null
           favorites: number
           id: string
           images: string[] | null
@@ -115,6 +116,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          etsy_listing_id?: string | null
           favorites?: number
           id?: string
           images?: string[] | null
@@ -133,6 +135,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          etsy_listing_id?: string | null
           favorites?: number
           id?: string
           images?: string[] | null
